@@ -10,7 +10,7 @@ import pyaudio
 #### CONSTANTS
 
 # start the audio at the next round time in seconds. A value of 10 means that if now is 14:23:24, start at 14:23:30
-START_AT_ROUND = 10
+START_AT_ROUND = 60
 
 #### internal use globals. No need to change
 wavi = 0 # index into the wav audio_data
@@ -93,6 +93,7 @@ wf = wave.open(filename, 'rb')
 data = wf.readframes(wf.getnframes())
 wf.close()
 
+
 # Get the dtype according to the sample width of the WAV file
 dtype_map = {
     1: np.uint8,    # 8-bit PCM
@@ -103,13 +104,18 @@ audio_dtype = dtype_map.get(wf.getsampwidth(), np.int16)  # Default to int16 if 
 
 # save the audio_data that will be played
 audio_data = np.frombuffer(data, dtype=audio_dtype)
-    
+
+# save sample rate
+sample_rate = wf.getframerate()
+
+print("File length: %f seconds and %d samples." % (len(audio_data)/sample_rate, len(audio_data)))
+print("sample rate %d, channels %d, sample width %d" % (sample_rate, wf.getnchannels(), wf.getsampwidth()))
+
+
+
 ## Make a buffer for sending to the sound card
 BUFSIZE = 1024 # size doesn't matter...
 _chunk = np.zeros(BUFSIZE, dtype=audio_dtype)
-    
-# save sample rate
-sample_rate = wf.getframerate()
 
 # Initialize PyAudio
 p = pyaudio.PyAudio()
@@ -123,9 +129,8 @@ stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
                 frames_per_buffer=BUFSIZE,
                 stream_callback=callback)
 
-
 ## Calculate when the stream should start
-now = time.time() 
+now = time.time()
 time_to_start = now + (START_AT_ROUND - now % START_AT_ROUND)
 print("Starting to play at " + time.ctime(time_to_start))
 
@@ -133,7 +138,6 @@ print("Starting to play at " + time.ctime(time_to_start))
 stream_time_offset = now - stream.get_time() # the time difference between stream time and clock time
 # convert time_to_start from clock time to stream time 
 stream_time_start = time_to_start - stream_time_offset
-
 
 
 # Start the stream
