@@ -10,7 +10,7 @@ import pyaudio
 #### CONSTANTS
 
 # start the audio at the next round time in seconds. A value of 10 means that if now is 14:23:24, start at 14:23:30
-START_AT_ROUND = 5
+START_AT_ROUND = 10
 
 #### internal use globals. No need to change
 wavi = 0 # index into the wav audio_data
