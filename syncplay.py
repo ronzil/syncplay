@@ -10,7 +10,7 @@ import pyaudio
 #### CONSTANTS
 
 # start the audio at the next round time in seconds. A value of 10 means that if now is 14:23:24, start at 14:23:30
-START_AT_ROUND = 60
+START_AT_ROUND = 5
 
 #### internal use globals. No need to change
 wavi = 0 # index into the wav audio_data
@@ -22,14 +22,14 @@ _skipcount = 0 # skip counter
 #####
 
 # add a delay to the output. param is in seconds in floating point
-def add_delay(delay_s):
+def add_delay(delta_s):
     global _delaycount
-    _delaycount += round(delay_s * sample_rate)
-    
-# skip the sound forward by delay_s in seconds     
-def add_skip(delay_s):
+    _delaycount += round(delta_s * sample_rate)
+
+# skip the sound by delay_s in seconds. If positive sound skips samples (forward in time) if negative sound repeats samples (backwards in time)
+def add_skip(delta_s):
     global _skipcount
-    _skipcount += round(delay_s * sample_rate)    
+    _skipcount += round(delta_s * sample_rate)
 
 # this is the main callback function that is called by the audio card to request samples
 def callback(in_data, frame_count, time_info, status):
@@ -59,14 +59,15 @@ def callback(in_data, frame_count, time_info, status):
     for i in range(bufsize):
         # set the next sample
         _chunk[i] = audio_data[wavi]
-        
+
         # if we need to introduce a delay, just continue the loop without incrementing wavi
         if _delaycount>0:
             _delaycount -= 1
             continue
+
         
-        # if skip requested push wavi forward
-        if _skipcount > 0:
+        # if skip requested move wavi forward or backward
+        if _skipcount != 0:
             wavi += _skipcount
             _skipcount = 0
             
@@ -143,39 +144,14 @@ stream_time_start = time_to_start - stream_time_offset
 # Start the stream
 stream.start_stream()
 
-# Process user commands
 while stream.is_active():
-    print("--------------")
-    print("Commands:")
-    print("quit - to quit")
-    print("delay XX - add delay of XX ms")
-    print("skip XX - skip forward  XX ms")
-    print("--------------")
-    try:
-        user_input = input()
-    except KeyboardInterrupt:
-        # Hit Ctrl-C to stop the stream
-        print("type 'quit' to exit")
-        continue    
-        
-    if user_input.lower() == 'quit':
-        break
-    elif user_input.lower().startswith('delay'):
-        try:
-            _, milliseconds = user_input.split()
-            delay = int(milliseconds)
-            add_delay(delay/1000)
-            print("Adding delay of %d ms" % (delay))
-        except ValueError:
-            print("Invalid delay value. Usage: delay <milliseconds>")
-    elif user_input.lower().startswith('skip'):
-        try:
-            _, milliseconds = user_input.split()
-            delay = int(milliseconds)
-            add_skip(delay/1000)
-            print("Skipping forward %d ms" % (delay))
-        except ValueError:
-            print("Invalid delay value. Usage: skip <milliseconds>")            
+    time.sleep(1)
+    offset = time.time() - stream.get_time() # the time difference between stream time and clock time
+    if abs(offset- stream_time_offset)>0.002:
+        delta = offset - stream_time_offset
+        print("Adjusting stream by %f miliseconds" % (delta*1000))
+        add_skip(delta)
+        stream_time_offset = offset
         
 
 # Stop and close the stream
